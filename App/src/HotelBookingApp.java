@@ -1,141 +1,181 @@
 import java.util.*;
 
-/**
- * =========================================================================
- * CLASS - Service
- * =========================================================================
- *
- * Use Case 7: Add-On Service Selection
- *
- * Description:
- * This class represents an optional service
- * that can be added to a confirmed reservation.
- *
- * Examples:
- * - Breakfast
- * - Spa
- * - Airport Pickup
- *
- * @version 7.0
- */
-class AddOnService {
+class Reservation {
 
-    /**
-     * Name of the service.
-     */
-    private String serviceName;
+    private String guestName;
+    private String roomType;
 
-    /**
-     * Cost of the service.
-     */
-    private double cost;
-
-    /**
-     * Creates a new add-on service.
-     *
-     * @param serviceName name of the service
-     * @param cost cost of the service
-     */
-    public AddOnService(String serviceName, double cost) {
-        this.serviceName = serviceName;
-        this.cost = cost;
+    public Reservation(String guestName, String roomType) {
+        this.guestName = guestName;
+        this.roomType = roomType;
     }
 
-    /**
-     * @return service name
-     */
-    public String getServiceName() { return serviceName; }
+    public String getGuestName() { return guestName; }
+    public String getRoomType() { return roomType; }
+}
 
-    /**
-     * @return service cost
-     */
-    public double getCost() { return cost; }
+class BookingRequestQueue {
+
+    private Queue<Reservation> requestQueue;
+
+    public BookingRequestQueue() {
+        requestQueue = new LinkedList<>();
+    }
+
+    public void addRequest(Reservation reservation) {
+        requestQueue.offer(reservation);
+    }
+
+    public Reservation getNextRequest() {
+        return requestQueue.poll();
+    }
+
+    public boolean hasPendingRequests() {
+        return !requestQueue.isEmpty();
+    }
+}
+
+class RoomInventory {
+
+    private Map<String, Integer> roomAvailability;
+
+    public RoomInventory() {
+        roomAvailability = new HashMap<>();
+        roomAvailability.put("Single", 5);
+        roomAvailability.put("Double", 3);
+        roomAvailability.put("Suite", 2);
+    }
+
+    public Map<String, Integer> getRoomAvailability() {
+        return roomAvailability;
+    }
+
+    public void updateAvailability(String roomType, int count) {
+        roomAvailability.put(roomType, count);
+    }
 }
 
 /**
  * =========================================================================
- * CLASS - AddOnServiceManager
+ * CLASS - RoomAllocationService
  * =========================================================================
  *
- * Use Case 7: Add-On Service Selection
+ * Use Case 6: Reservation Confirmation & Room Allocation
  *
  * Description:
- * This class manages optional services
- * associated with confirmed reservations.
+ * This class is responsible for confirming
+ * booking requests and assigning rooms.
  *
- * It supports attaching multiple services
- * to a single reservation.
+ * It ensures:
+ * - Each room ID is unique
+ * - Inventory is updated immediately
+ * - No room is double-booked
  *
- * @version 7.0
+ * @version 6.0
  */
-class AddOnServiceManager {
+class RoomAllocationService {
 
     /**
-     * Maps reservation ID to selected services.
+     * Stores all allocated room IDs to
+     * prevent duplicate assignments.
+     */
+    private Set<String> allocatedRoomIds;
+
+    /**
+     * Stores assigned room IDs by room type.
      *
-     * Key -> Reservation ID
-     * Value -> List of selected services
+     * Key -> Room type
+     * Value -> Set of assigned room IDs
      */
-    private Map<String, List<AddOnService>> servicesByReservation;
+    private Map<String, Set<String>> assignedRoomsByType;
 
     /**
-     * Initializes the service manager.
+     * Initializes allocation tracking structures.
      */
-    public AddOnServiceManager() {
-        servicesByReservation = new HashMap<>();
+    public RoomAllocationService() {
+        allocatedRoomIds = new HashSet<>();
+        assignedRoomsByType = new HashMap<>();
     }
 
     /**
-     * Attaches a service to a reservation.
+     * Confirms a booking request by assigning
+     * a unique room ID and updating inventory.
      *
-     * @param reservationId confirmed reservation ID
-     * @param service add-on service
+     * @param reservation booking request
+     * @param inventory centralized room inventory
      */
-    public void addService(String reservationId, AddOnService service) {
+    public void allocateRoom(Reservation reservation, RoomInventory inventory) {
 
-        servicesByReservation
-                .computeIfAbsent(reservationId, k -> new ArrayList<>())
-                .add(service);
+        String roomType = reservation.getRoomType();
+        Map<String, Integer> availability = inventory.getRoomAvailability();
+
+        if (availability.get(roomType) > 0) {
+
+            String roomId = generateRoomId(roomType);
+
+            // Add to allocated room set
+            allocatedRoomIds.add(roomId);
+
+            // Store assigned room by type
+            assignedRoomsByType
+                    .computeIfAbsent(roomType, k -> new HashSet<>())
+                    .add(roomId);
+
+            // Update inventory
+            inventory.updateAvailability(roomType,
+                    availability.get(roomType) - 1);
+
+            System.out.println("Booking confirmed for Guest: "
+                    + reservation.getGuestName()
+                    + ", Room ID: " + roomId);
+
+        } else {
+            System.out.println("No rooms available for Guest: "
+                    + reservation.getGuestName());
+        }
     }
 
     /**
-     * Calculates total add-on cost
-     * for a reservation.
+     * Generates a unique room ID
+     * for the given room type.
      *
-     * @param reservationId reservation ID
-     * @return total service cost
+     * @param roomType type of room
+     * @return unique room ID
      */
-    public double calculateTotalServiceCost(String reservationId) {
+    private String generateRoomId(String roomType) {
 
-        double total = 0.0;
+        int count = assignedRoomsByType
+                .getOrDefault(roomType, new HashSet<>())
+                .size() + 1;
 
-        List<AddOnService> services = servicesByReservation.get(reservationId);
+        String roomId = roomType + "-" + count;
 
-        if (services != null) {
-            for (AddOnService s : services) {
-                total += s.getCost();
-            }
+        // Ensure uniqueness
+        while (allocatedRoomIds.contains(roomId)) {
+            count++;
+            roomId = roomType + "-" + count;
         }
 
-        return total;
+        return roomId;
     }
 }
 
 /**
  * =========================================================================
- * MAIN CLASS - HotelBookingApp
+ * MAIN CLASS - UseCase6RoomAllocation
  * =========================================================================
  *
- * Use Case 7: Add-On Service Selection
+ * Use Case 6: Reservation Confirmation & Room Allocation
+ *
  * Description:
- * This class demonstrates how optional
- * services can be attached to a confirmed
- * booking.
+ * This class demonstrates how booking
+ * requests are confirmed and rooms
+ * are allocated safely.
  *
- * Services are added after room allocation
- * and do not affect inventory.
+ * It consumes booking requests in FIFO
+ * order and updates inventory immediately.
  *
- * @version 7.0
+ * @version 6.0
  */
 public class HotelBookingApp {
 
@@ -146,27 +186,217 @@ public class HotelBookingApp {
      */
     public static void main(String[] args) {
 
-        System.out.println("Add-On Service Selection");
+        System.out.println("Room Allocation Processing");
 
-        // Assume reservation already confirmed
-        String reservationId = "Single-1";
+        // Create queue
+        BookingRequestQueue bookingQueue = new BookingRequestQueue();
 
-        // Create service manager
-        AddOnServiceManager serviceManager = new AddOnServiceManager();
+        // Add booking requests
+        bookingQueue.addRequest(new Reservation("Abhi", "Single"));
+        bookingQueue.addRequest(new Reservation("Subha", "Single"));
+        bookingQueue.addRequest(new Reservation("Vanmathi", "Suite"));
 
-        // Create add-on services
-        AddOnService s1 = new AddOnService("Breakfast", 500.0);
-        AddOnService s2 = new AddOnService("Spa", 1000.0);
+        // Create inventory
+        RoomInventory inventory = new RoomInventory();
 
-        // Attach services to reservation
-        serviceManager.addService(reservationId, s1);
-        serviceManager.addService(reservationId, s2);
+        // Create allocation service
+        RoomAllocationService allocationService = new RoomAllocationService();
 
-        // Calculate total service cost
-        double totalCost = serviceManager.calculateTotalServiceCost(reservationId);
+        // Process queue
+        while (bookingQueue.hasPendingRequests()) {
 
-        // Display result
-        System.out.println("Reservation ID: " + reservationId);
-        System.out.println("Total Add-On Cost: " + totalCost);
+            Reservation r = bookingQueue.getNextRequest();
+            allocationService.allocateRoom(r, inventory);
+        }
+    }
+}import java.util.*;
+
+/**
+ * =========================================================================
+ * CLASS - InvalidBookingException
+ * =========================================================================
+ *
+ * Use Case 9: Error Handling & Validation
+ *
+ * Description:
+ * This custom exception represents
+ * invalid booking scenarios in the system.
+ *
+ * Using a domain-specific exception
+ * makes error handling clearer and safer.
+ *
+ * @version 9.0
+ */
+class InvalidBookingException extends Exception {
+
+    /**
+     * Creates an exception with
+     * a descriptive error message.
+     *
+     * @param message error description
+     */
+    public InvalidBookingException(String message) {
+        super(message);
+    }
+}
+
+class RoomInventory {
+
+    private Map<String, Integer> roomAvailability;
+
+    public RoomInventory() {
+        roomAvailability = new HashMap<>();
+        roomAvailability.put("Single", 5);
+        roomAvailability.put("Double", 3);
+        roomAvailability.put("Suite", 2);
+    }
+
+    public Map<String, Integer> getRoomAvailability() {
+        return roomAvailability;
+    }
+}
+
+class BookingRequestQueue {
+
+    private Queue<Reservation> requestQueue;
+
+    public BookingRequestQueue() {
+        requestQueue = new LinkedList<>();
+    }
+
+    public void addRequest(Reservation reservation) {
+        requestQueue.offer(reservation);
+    }
+}
+
+class Reservation {
+
+    private String guestName;
+    private String roomType;
+
+    public Reservation(String guestName, String roomType) {
+        this.guestName = guestName;
+        this.roomType = roomType;
+    }
+
+    public String getGuestName() { return guestName; }
+    public String getRoomType() { return roomType; }
+}
+
+/**
+ * =========================================================================
+ * CLASS - ReservationValidator
+ * =========================================================================
+ *
+ * Use Case 9: Error Handling & Validation
+ *
+ * Description:
+ * This class is responsible for validating
+ * booking requests before they are processed.
+ *
+ * All validation rules are centralized
+ * to avoid duplication and inconsistency.
+ *
+ * @version 9.0
+ */
+class ReservationValidator {
+
+    /**
+     * Validates booking input provided by the user.
+     *
+     * @param guestName name of the guest
+     * @param roomType requested room type
+     * @param inventory centralized inventory
+     * @throws InvalidBookingException if validation fails
+     */
+    public void validate(
+            String guestName,
+            String roomType,
+            RoomInventory inventory
+    ) throws InvalidBookingException {
+
+        // Validate guest name
+        if (guestName == null || guestName.trim().isEmpty()) {
+            throw new InvalidBookingException("Guest name cannot be empty.");
+        }
+
+        // Validate room type (case sensitive)
+        Map<String, Integer> availability = inventory.getRoomAvailability();
+
+        if (!availability.containsKey(roomType)) {
+            throw new InvalidBookingException("Invalid room type selected.");
+        }
+
+        // Validate availability not zero or negative
+        if (availability.get(roomType) <= 0) {
+            throw new InvalidBookingException("Selected room type is not available.");
+        }
+    }
+}
+
+
+/**
+ * =========================================================================
+ * MAIN CLASS - HotelBookingApp
+ * =========================================================================
+ *
+ * Use Case 9: Error Handling & Validation
+ *
+ * Description:
+ * This class demonstrates how user input
+ * is validated before booking is processed.
+ *
+ * The system:
+ * Accepts user input
+ * Validates input centrally
+ * Handles errors gracefully
+ *
+ * @version 9.0
+ */
+public class HotelBookingApp {
+
+    /**
+     * Application entry point.
+     *
+     * @param args Command-line arguments
+     */
+    public static void main(String[] args) {
+
+        // Display application header
+        System.out.println("Booking Validation");
+
+        Scanner scanner = new Scanner(System.in);
+
+        // Initialize required components
+        RoomInventory inventory = new RoomInventory();
+        ReservationValidator validator = new ReservationValidator();
+        BookingRequestQueue bookingQueue = new BookingRequestQueue();
+
+        try {
+
+            // Take input
+            System.out.print("Enter guest name: ");
+            String guestName = scanner.nextLine();
+
+            System.out.print("Enter room type (Single/Double/Suite): ");
+            String roomType = scanner.nextLine();
+
+            // Validate input
+            validator.validate(guestName, roomType, inventory);
+
+            // If valid, create reservation
+            Reservation reservation = new Reservation(guestName, roomType);
+            bookingQueue.addRequest(reservation);
+
+            System.out.println("Booking request accepted.");
+
+        } catch (InvalidBookingException e) {
+
+            // Handle domain-specific validation errors
+            System.out.println("Booking failed: " + e.getMessage());
+
+        } finally {
+            scanner.close();
+        }
     }
 }
