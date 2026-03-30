@@ -14,168 +14,113 @@ class Reservation {
     public String getRoomType() { return roomType; }
 }
 
-class BookingRequestQueue {
-
-    private Queue<Reservation> requestQueue;
-
-    public BookingRequestQueue() {
-        requestQueue = new LinkedList<>();
-    }
-
-    public void addRequest(Reservation reservation) {
-        requestQueue.offer(reservation);
-    }
-
-    public Reservation getNextRequest() {
-        return requestQueue.poll();
-    }
-
-    public boolean hasPendingRequests() {
-        return !requestQueue.isEmpty();
-    }
-}
-
-class RoomInventory {
-
-    private Map<String, Integer> roomAvailability;
-
-    public RoomInventory() {
-        roomAvailability = new HashMap<>();
-        roomAvailability.put("Single", 5);
-        roomAvailability.put("Double", 3);
-        roomAvailability.put("Suite", 2);
-    }
-
-    public Map<String, Integer> getRoomAvailability() {
-        return roomAvailability;
-    }
-
-    public void updateAvailability(String roomType, int count) {
-        roomAvailability.put(roomType, count);
-    }
-}
 
 /**
  * =========================================================================
- * CLASS - RoomAllocationService
+ * CLASS - BookingHistory
  * =========================================================================
  *
- * Use Case 6: Reservation Confirmation & Room Allocation
+ * Use Case 8: Booking History & Reporting
  *
  * Description:
- * This class is responsible for confirming
- * booking requests and assigning rooms.
+ * This class maintains a record of
+ * confirmed reservations.
  *
- * It ensures:
- * - Each room ID is unique
- * - Inventory is updated immediately
- * - No room is double-booked
+ * It provides ordered storage for
+ * historical and reporting purposes.
  *
- * @version 6.0
+ * @version 8.0
  */
-class RoomAllocationService {
+class BookingHistory {
 
     /**
-     * Stores all allocated room IDs to
-     * prevent duplicate assignments.
+     * List that stores confirmed reservations.
      */
-    private Set<String> allocatedRoomIds;
+    private List<Reservation> confirmedReservations;
 
     /**
-     * Stores assigned room IDs by room type.
-     *
-     * Key -> Room type
-     * Value -> Set of assigned room IDs
+     * Initializes an empty booking history.
      */
-    private Map<String, Set<String>> assignedRoomsByType;
-
-    /**
-     * Initializes allocation tracking structures.
-     */
-    public RoomAllocationService() {
-        allocatedRoomIds = new HashSet<>();
-        assignedRoomsByType = new HashMap<>();
+    public BookingHistory() {
+        confirmedReservations = new ArrayList<>();
     }
 
     /**
-     * Confirms a booking request by assigning
-     * a unique room ID and updating inventory.
+     * Adds a confirmed reservation
+     * to booking history.
      *
-     * @param reservation booking request
-     * @param inventory centralized room inventory
+     * @param reservation confirmed booking
      */
-    public void allocateRoom(Reservation reservation, RoomInventory inventory) {
-
-        String roomType = reservation.getRoomType();
-        Map<String, Integer> availability = inventory.getRoomAvailability();
-
-        if (availability.get(roomType) > 0) {
-
-            String roomId = generateRoomId(roomType);
-
-            // Add to allocated room set
-            allocatedRoomIds.add(roomId);
-
-            // Store assigned room by type
-            assignedRoomsByType
-                    .computeIfAbsent(roomType, k -> new HashSet<>())
-                    .add(roomId);
-
-            // Update inventory
-            inventory.updateAvailability(roomType,
-                    availability.get(roomType) - 1);
-
-            System.out.println("Booking confirmed for Guest: "
-                    + reservation.getGuestName()
-                    + ", Room ID: " + roomId);
-
-        } else {
-            System.out.println("No rooms available for Guest: "
-                    + reservation.getGuestName());
-        }
+    public void addReservation(Reservation reservation) {
+        confirmedReservations.add(reservation);
     }
 
     /**
-     * Generates a unique room ID
-     * for the given room type.
+     * Returns all confirmed reservations.
      *
-     * @param roomType type of room
-     * @return unique room ID
+     * @return list of reservations
      */
-    private String generateRoomId(String roomType) {
-
-        int count = assignedRoomsByType
-                .getOrDefault(roomType, new HashSet<>())
-                .size() + 1;
-
-        String roomId = roomType + "-" + count;
-
-        // Ensure uniqueness
-        while (allocatedRoomIds.contains(roomId)) {
-            count++;
-            roomId = roomType + "-" + count;
-        }
-
-        return roomId;
+    public List<Reservation> getConfirmedReservations() {
+        return confirmedReservations;
     }
 }
 
+
 /**
  * =========================================================================
- * MAIN CLASS - UseCase6RoomAllocation
+ * CLASS - BookingReportService
  * =========================================================================
  *
- * Use Case 6: Reservation Confirmation & Room Allocation
+ * Use Case 8: Booking History & Reporting
  *
  * Description:
- * This class demonstrates how booking
- * requests are confirmed and rooms
- * are allocated safely.
+ * This class generates reports
+ * from booking history data.
  *
- * It consumes booking requests in FIFO
- * order and updates inventory immediately.
+ * Reporting logic is separated
+ * from data storage.
  *
- * @version 6.0
+ * @version 8.0
+ */
+class BookingReportService {
+
+    /**
+     * Displays a summary report
+     * of all confirmed bookings.
+     *
+     * @param history booking history
+     */
+    public void generateReport(BookingHistory history) {
+
+        System.out.println("Booking History Report");
+
+        for (Reservation r : history.getConfirmedReservations()) {
+
+            System.out.println("Guest: "
+                    + r.getGuestName()
+                    + ", Room Type: "
+                    + r.getRoomType());
+        }
+    }
+}
+
+
+/**
+ * =========================================================================
+ * MAIN CLASS - HotelBookingApp
+ * =========================================================================
+ *
+ * Use Case 8: Booking History & Reporting
+ *
+ * Description:
+ * This class demonstrates how
+ * confirmed bookings are stored
+ * and reported.
+ *
+ * The system maintains an ordered
+ * audit trail of reservations.
+ *
+ * @version 8.0
  */
 public class HotelBookingApp {
 
@@ -186,27 +131,18 @@ public class HotelBookingApp {
      */
     public static void main(String[] args) {
 
-        System.out.println("Room Allocation Processing");
+        System.out.println("Booking History and Reporting");
 
-        // Create queue
-        BookingRequestQueue bookingQueue = new BookingRequestQueue();
+        // Create booking history
+        BookingHistory history = new BookingHistory();
 
-        // Add booking requests
-        bookingQueue.addRequest(new Reservation("Abhi", "Single"));
-        bookingQueue.addRequest(new Reservation("Subha", "Single"));
-        bookingQueue.addRequest(new Reservation("Vanmathi", "Suite"));
+        // Add confirmed reservations
+        history.addReservation(new Reservation("Abhi", "Single"));
+        history.addReservation(new Reservation("Subha", "Double"));
+        history.addReservation(new Reservation("Vanmathi", "Suite"));
 
-        // Create inventory
-        RoomInventory inventory = new RoomInventory();
-
-        // Create allocation service
-        RoomAllocationService allocationService = new RoomAllocationService();
-
-        // Process queue
-        while (bookingQueue.hasPendingRequests()) {
-
-            Reservation r = bookingQueue.getNextRequest();
-            allocationService.allocateRoom(r, inventory);
-        }
+        // Generate report
+        BookingReportService reportService = new BookingReportService();
+        reportService.generateReport(history);
     }
 }
